@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
 
-/// 可点击区域：补充鼠标指针与悬停反馈
-///
-/// [GestureDetector] 不会自动把光标切成"可点击"形态（[InkWell] 会），
-/// 桌面端所有非水波纹的点击热区统一用本组件包裹，保证鼠标移上去
-/// 有正确的指针提示。
-class Clickable extends StatelessWidget {
+/// 可点击区域：鼠标指针、悬停、以及电视遥控器焦点/OK 键
+class Clickable extends StatefulWidget {
   final VoidCallback? onTap;
   final VoidCallback? onDoubleTap;
   final Widget child;
@@ -22,14 +18,43 @@ class Clickable extends StatelessWidget {
   });
 
   @override
+  State<Clickable> createState() => _ClickableState();
+}
+
+class _ClickableState extends State<Clickable> {
+  bool _focused = false;
+
+  @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: cursor,
+    final enabled = widget.onTap != null || widget.onDoubleTap != null;
+    final focusColor = Theme.of(context).colorScheme.primary;
+    return FocusableActionDetector(
+      enabled: enabled,
+      mouseCursor: widget.cursor,
+      onShowFocusHighlight: (v) {
+        if (_focused == v) return;
+        setState(() => _focused = v);
+      },
+      actions: {
+        if (widget.onTap != null)
+          ActivateIntent: CallbackAction<ActivateIntent>(
+            onInvoke: (_) {
+              widget.onTap!();
+              return null;
+            },
+          ),
+      },
       child: GestureDetector(
-        behavior: behavior,
-        onTap: onTap,
-        onDoubleTap: onDoubleTap,
-        child: child,
+        behavior: widget.behavior,
+        onTap: widget.onTap,
+        onDoubleTap: widget.onDoubleTap,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: _focused ? Border.all(color: focusColor, width: 2) : null,
+          ),
+          child: widget.child,
+        ),
       ),
     );
   }

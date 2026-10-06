@@ -27,6 +27,7 @@ class PosterCard extends StatefulWidget {
 
 class _PosterCardState extends State<PosterCard> {
   bool _hovered = false;
+  bool _focused = false;
 
   void _setHover(bool v) {
     if (_hovered == v) return;
@@ -40,14 +41,26 @@ class _PosterCardState extends State<PosterCard> {
     final secondary = isDark ? Colors.white54 : Colors.black45;
     final primary = theme.colorScheme.primary;
     final drama = widget.drama;
+    final highlighted = _hovered || _focused;
 
     return Semantics(
       button: true,
       label: drama.title,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => _setHover(true),
-        onExit: (_) => _setHover(false),
+      child: FocusableActionDetector(
+        mouseCursor: SystemMouseCursors.click,
+        onShowHoverHighlight: _setHover,
+        onShowFocusHighlight: (v) {
+          if (_focused == v) return;
+          setState(() => _focused = v);
+        },
+        actions: {
+          ActivateIntent: CallbackAction<ActivateIntent>(
+            onInvoke: (_) {
+              widget.onTap();
+              return null;
+            },
+          ),
+        },
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: widget.onTap,
@@ -62,7 +75,7 @@ class _PosterCardState extends State<PosterCard> {
                     ClipRRect(
                       borderRadius: BorderRadius.circular(10),
                       child: AnimatedScale(
-                        scale: _hovered ? 1.05 : 1,
+                        scale: highlighted ? 1.05 : 1,
                         duration: const Duration(milliseconds: 200),
                         curve: Curves.easeOutCubic,
                         child: CoverImage(
@@ -75,7 +88,7 @@ class _PosterCardState extends State<PosterCard> {
                     ),
                     // 悬停播放遮罩
                     AnimatedOpacity(
-                      opacity: _hovered ? 1 : 0,
+                      opacity: highlighted ? 1 : 0,
                       duration: const Duration(milliseconds: 160),
                       child: DecoratedBox(
                         decoration: BoxDecoration(
@@ -117,7 +130,7 @@ class _PosterCardState extends State<PosterCard> {
                     ),
                     // 悬停高亮描边
                     AnimatedOpacity(
-                      opacity: _hovered ? 1 : 0,
+                      opacity: highlighted ? 1 : 0,
                       duration: const Duration(milliseconds: 160),
                       child: DecoratedBox(
                         decoration: BoxDecoration(
@@ -140,7 +153,7 @@ class _PosterCardState extends State<PosterCard> {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: _hovered ? primary : null,
+                  color: highlighted ? primary : null,
                 ),
               ),
               const SizedBox(height: 3),
