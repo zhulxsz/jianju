@@ -47,6 +47,11 @@ class _RootPageState extends State<RootPage> {
     if (i == _index) return;
     debugPrint('[NAV] tab=$i');
     setState(() => _index = i);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final scope = FocusScope.of(context);
+      if (scope.focusedChild == null) scope.nextFocus();
+    });
   }
 
   void _openSearch() => Navigator.of(context).push(
@@ -78,11 +83,11 @@ class _RootPageState extends State<RootPage> {
     final pages = IndexedStack(
       key: ValueKey(source),
       index: _index,
-      children: const [
-        HomePage(),
-        CategoryPage(),
-        RankPage(),
-        MinePage(),
+      children: [
+        ExcludeFocus(excluding: _index != 0, child: const HomePage()),
+        ExcludeFocus(excluding: _index != 1, child: const CategoryPage()),
+        ExcludeFocus(excluding: _index != 2, child: const RankPage()),
+        ExcludeFocus(excluding: _index != 3, child: const MinePage()),
       ],
     );
 

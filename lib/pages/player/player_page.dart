@@ -52,6 +52,8 @@ class _PlayerPageState extends State<PlayerPage> with WidgetsBindingObserver {
   final List<StreamSubscription> _subs = [];
   Timer? _progressTimer;
   Timer? _hideTimer;
+  final FocusNode _playerFocus = FocusNode(debugLabel: 'playerRemote');
+  final FocusNode _playButtonFocus = FocusNode(debugLabel: 'playerPlay');
 
   late Episode _episode;
   double _speed = 1.0;
@@ -943,6 +945,7 @@ class _PlayerPageState extends State<PlayerPage> with WidgetsBindingObserver {
     debugPrint('[UI] toggleControls -> ${_controlsVisible ? 'hide' : 'show'}');
     if (_controlsVisible) {
       setState(() => _controlsVisible = false);
+      _playerFocus.requestFocus();
     } else {
       _showControls();
     }
@@ -951,6 +954,9 @@ class _PlayerPageState extends State<PlayerPage> with WidgetsBindingObserver {
   void _showControls() {
     setState(() => _controlsVisible = true);
     _scheduleHideControls();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _playButtonFocus.requestFocus();
+    });
   }
 
   void _scheduleHideControls() {
@@ -958,6 +964,7 @@ class _PlayerPageState extends State<PlayerPage> with WidgetsBindingObserver {
     _hideTimer = Timer(const Duration(seconds: 4), () {
       if (mounted && _playing && !_hovering) {
         setState(() => _controlsVisible = false);
+        _playerFocus.requestFocus();
       }
     });
   }
@@ -971,6 +978,116 @@ class _PlayerPageState extends State<PlayerPage> with WidgetsBindingObserver {
       _player.play();
       _scheduleHideControls();
     }
+  }
+
+  void _seekRelative(Duration delta) {
+    if (_duration <= Duration.zero) return;
+    var target = _position + delta;
+    if (target < Duration.zero) target = Duration.zero;
+    if (target > _duration) target = _duration;
+    _recoveryTimer?.cancel();
+    _recoveryTimer = null;
+    _lastStable = target;
+    _seekWithVerify(target, _openSeq);
+    _showControls();
+  }
+
+  void _nudgeVolume(double delta) {
+    final next = (_volume + delta).clamp(0, 100).toDouble();
+    _volume = next;
+    _player.setVolume(next);
+    if (mounted) setState(() {});
+    _showControls();
+  }
+
+  KeyEventResult _onRemoteKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.escape || key == LogicalKeyboardKey.goBack) {
+      if (_fullscreen) {
+        _toggleFullscreen();
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.ignored;
+    }
+    if (key == LogicalKeyboardKey.space ||
+        key == LogicalKeyboardKey.mediaPlayPause) {
+      if (_loading) return KeyEventResult.handled;
+      _togglePlay();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.select ||
+        key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter ||
+        key == LogicalKeyboardKey.gameButtonA) {
+      if (_loading) return KeyEventResult.handled;
+      if (!_controlsVisible) {
+        _showControls();
+        return KeyEventResult.handled;
+      }
+      // 控件已显示：交给按钮焦点处理 OK
+      return KeyEventResult.ignored;
+    }
+    if (key == LogicalKeyboardKey.mediaPlay) {
+      _player.play();
+      _scheduleHideControls();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.mediaPause) {
+      _player.pause();
+      _showControls();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.mediaRewind) {
+      _seekRelative(const Duration(seconds: -10));
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.mediaFastForward) {
+      _seekRelative(const Duration(seconds: 10));
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.audioVolumeUp) {
+      _nudgeVolume(5);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.audioVolumeDown) {
+      _nudgeVolume(-5);
+      return KeyEventResult.handled;
+    }
+    if (!_controlsVisible) {
+      if (key == LogicalKeyboardKey.arrowLeft) {
+        _seekRelative(const Duration(seconds: -10));
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowRight) {
+        _seekRelative(const Duration(seconds: 10));
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowUp) {
+        _nudgeVolume(5);
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowDown) {
+        _nudgeVolume(-5);
+        return KeyEventResult.handled;
+      }
+    }
+    if (key == LogicalKeyboardKey.mediaTrackNext) {
+      if (_hasNextPlayable) _openEpisodeSmart(_nextPlayable!);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.mediaTrackPrevious) {
+      final prev = _prevEpisode;
+      if (prev != null) _openEpisodeSmart(prev);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.contextMenu) {
+      _showEpisodeSheet();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   // ==================== 全屏 ====================
@@ -1441,18 +1558,18 @@ class _PlayerPageState extends State<PlayerPage> with WidgetsBindingObserver {
       ),
     );
 
-    // Esc：全屏时先退出全屏，否则返回上一页（优先级高于全局 Esc 绑定）
-    return CallbackShortcuts(
-      bindings: {
-        const SingleActivator(LogicalKeyboardKey.escape): () {
-          if (_fullscreen) {
-            _toggleFullscreen();
-          } else {
-            Navigator.of(context).maybePop();
-          }
-        },
+    // 遥控器 / 键盘：OK 播放暂停，左右快进，上下音量，返回键退出全屏
+    return PopScope(
+      canPop: !_fullscreen,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _fullscreen) _toggleFullscreen();
       },
-      child: page,
+      child: Focus(
+        focusNode: _playerFocus,
+        autofocus: true,
+        onKeyEvent: _onRemoteKey,
+        child: page,
+      ),
     );
   }
 
@@ -1596,6 +1713,7 @@ class _PlayerPageState extends State<PlayerPage> with WidgetsBindingObserver {
                 opacity: _playing && !visible ? 0 : 1,
                 duration: const Duration(milliseconds: 200),
                 child: IconButton(
+                  focusNode: _playButtonFocus,
                   iconSize: 68,
                   color: Colors.white,
                   onPressed: _loading ? null : _togglePlay,
@@ -1833,6 +1951,8 @@ class _PlayerPageState extends State<PlayerPage> with WidgetsBindingObserver {
     }
     _progressTimer?.cancel();
     _hideTimer?.cancel();
+    _playerFocus.dispose();
+    _playButtonFocus.dispose();
     _recoveryTimer?.cancel();
     _errorWatchdog?.cancel();
     _completedSub?.cancel();

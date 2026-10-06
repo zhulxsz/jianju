@@ -9,6 +9,7 @@ import 'core/state/theme_provider.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/responsive.dart';
 import 'pages/root_page.dart';
+import 'widgets/remote_scope.dart';
 import 'widgets/update_flow.dart';
 
 /// APP 根组件：主题系统挂载点 + 启动后自动检查更新
@@ -76,7 +77,15 @@ class _JianjuAppState extends State<JianjuApp> {
         // 桌面端惯例：Esc 返回上一页（弹窗走 barrier 自带逻辑，
         // 播放页在其路由内绑定 Esc，优先级高于本全局绑定）
         builder: (context, child) {
-          final Widget subtree = child ?? const SizedBox.shrink();
+          // 方向键走焦点（电视遥控器 / 盒子）；触摸滚动不受影响
+          final Widget subtree = MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              navigationMode: NavigationMode.directional,
+            ),
+            child: RemoteActivateScope(
+              child: child ?? const SizedBox.shrink(),
+            ),
+          );
           if (defaultTargetPlatform == TargetPlatform.android) return subtree;
           return CallbackShortcuts(
             bindings: {

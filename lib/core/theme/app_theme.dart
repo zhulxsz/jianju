@@ -64,6 +64,7 @@ class AppTheme {
       highlightColor: isDark
           ? Colors.white.withValues(alpha: 0.05)
           : Colors.black.withValues(alpha: 0.03),
+      focusColor: seed.withValues(alpha: 0.22),
       appBarTheme: AppBarTheme(
         // 桌面端标题左对齐（更接近原生桌面应用），移动端保持居中
         centerTitle: !wide,

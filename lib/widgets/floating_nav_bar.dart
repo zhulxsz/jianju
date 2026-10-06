@@ -81,7 +81,7 @@ class NavItem {
   });
 }
 
-class _NavItemView extends StatelessWidget {
+class _NavItemView extends StatefulWidget {
   final NavItem item;
   final bool selected;
   final Color primaryColor;
@@ -97,50 +97,79 @@ class _NavItemView extends StatelessWidget {
   });
 
   @override
+  State<_NavItemView> createState() => _NavItemViewState();
+}
+
+class _NavItemViewState extends State<_NavItemView> {
+  bool _focused = false;
+
+  @override
   Widget build(BuildContext context) {
+    final selected = widget.selected;
+    final primaryColor = widget.primaryColor;
+    final item = widget.item;
+    final iconInactive = widget.iconInactive;
+    final onTap = widget.onTap;
     return Expanded(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 320),
-          curve: Curves.easeOutCubic,
-          margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-          padding: EdgeInsets.symmetric(horizontal: selected ? 14 : 0),
-          decoration: BoxDecoration(
-            color: selected
-                ? primaryColor.withValues(alpha: 0.16)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(24),
+      child: FocusableActionDetector(
+        mouseCursor: SystemMouseCursors.click,
+        onShowFocusHighlight: (v) {
+          if (_focused == v) return;
+          setState(() => _focused = v);
+        },
+        actions: {
+          ActivateIntent: CallbackAction<ActivateIntent>(
+            onInvoke: (_) {
+              onTap();
+              return null;
+            },
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                selected ? item.activeIcon : item.icon,
-                size: 22,
-                color: selected ? primaryColor : iconInactive,
-              ),
-              // 选中项展开显示文字（苹果悬浮条风格）
-              AnimatedSize(
-                duration: const Duration(milliseconds: 280),
-                curve: Curves.easeOutCubic,
-                child: selected
-                    ? Padding(
-                        padding: const EdgeInsets.only(left: 6),
-                        child: Text(
-                          item.label,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: primaryColor,
+        },
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 320),
+            curve: Curves.easeOutCubic,
+            margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            padding: EdgeInsets.symmetric(horizontal: selected ? 14 : 0),
+            decoration: BoxDecoration(
+              color: selected
+                  ? primaryColor.withValues(alpha: 0.16)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(24),
+              border: _focused
+                  ? Border.all(color: primaryColor, width: 1.5)
+                  : null,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  selected ? item.activeIcon : item.icon,
+                  size: 22,
+                  color: selected ? primaryColor : iconInactive,
+                ),
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 280),
+                  curve: Curves.easeOutCubic,
+                  child: selected
+                      ? Padding(
+                          padding: const EdgeInsets.only(left: 6),
+                          child: Text(
+                            item.label,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: primaryColor,
+                            ),
                           ),
-                        ),
-                      )
-                    : const SizedBox.shrink(),
-              ),
-            ],
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ],
+            ),
           ),
         ),
       ),
